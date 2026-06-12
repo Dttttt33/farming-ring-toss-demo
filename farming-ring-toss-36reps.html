@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>农场套圈 · 36 Reps Demo</title>
+  <style>
+    :root { --ink:#174d3d; --cream:#fff9df; --gold:#ffbd39; --orange:#ef7b35; --sky:#8ddadd; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; font-family:ui-rounded,"SF Pro Rounded","PingFang SC",sans-serif; user-select:none; background:#67bfc4; }
+    #game {
+      position:relative; width:100vw; height:100vh; min-width:920px; min-height:620px; overflow:hidden;
+      background:linear-gradient(#8bdadd 0 43%,#72b950 43% 63%,#438540 63%);
+    }
+    #game.act2 { filter:saturate(1.08); }
+    #game.act2 .sun { background:rgba(255,221,92,.78); box-shadow:0 0 35px #ffe46d; }
+    #game.act3 { background:linear-gradient(#6595a5 0 43%,#5f9a4c 43% 63%,#376d3a 63%); }
+    #game.act3::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.16; background:repeating-linear-gradient(112deg,transparent 0 38px,#d5f3ff 40px 43px); animation:storm .8s linear infinite; }
+    #game::before { content:""; position:absolute; inset:63% 0 0; opacity:.16; background:repeating-linear-gradient(106deg,transparent 0 100px,#efd965 103px 109px); }
+    .hill { position:absolute; top:32%; width:64%; height:30%; border-radius:50% 50% 0 0; background:#5ca34f; }
+    .hill.a { left:-20%; transform:rotate(7deg); }
+    .hill.b { right:-20%; background:#70b84c; transform:rotate(-6deg); }
+    .sun { position:absolute; right:12%; top:10%; width:100px; height:100px; border-radius:50%; background:rgba(255,242,147,.6); }
+
+    #progressHud {
+      position:absolute; z-index:12; left:5%; top:24px; width:58%; transform:none;
+      padding:14px 22px 12px; border:4px solid rgba(255,255,255,.75); border-radius:25px;
+      color:var(--ink); background:rgba(255,250,226,.94); box-shadow:0 13px 28px rgba(24,81,60,.2);
+    }
+    .hud-line { display:flex; justify-content:space-between; align-items:center; font-weight:1000; }
+    #stageName { font-size:22px; } #repCount { font-size:24px; }
+    .track { position:relative; height:12px; margin-top:10px; border-radius:99px; background:#cbd6c4; }
+    #fill { height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,#7edb66,#ffe064,#ff9e37); transition:width .45s; }
+    .progress-dots { position:absolute; inset:-4px 0; display:flex; justify-content:space-between; pointer-events:none; }
+    .progress-dots i { width:20px; height:20px; border:4px solid #30644e; border-radius:50%; background:#fff9df; }
+    .progress-labels { display:flex; justify-content:space-between; margin-top:7px; color:#63806f; font-size:13px; font-weight:900; }
+
+    .card {
+      position:absolute; z-index:10; background:rgba(255,250,226,.96); border:4px solid rgba(255,255,255,.8);
+      border-radius:30px; box-shadow:0 15px 30px rgba(25,77,57,.21);
+    }
+    #actionCard {
+      left:2.5%; bottom:4%; width:250px; padding:16px;
+    }
+    .card-head { display:flex; justify-content:space-between; align-items:center; }
+    .card-head strong { display:block; font-size:20px; color:var(--ink); white-space:nowrap; }
+    #localRep { color:#dd712f; font-weight:1000; }
+    #pose { width:100%; height:150px; margin-top:11px; overflow:hidden; border-radius:20px; background:#deefcd; }
+    #pose svg { width:100%; height:100%; }
+    #actionName { margin-top:8px; color:var(--ink); text-align:center; font-size:17px; font-weight:1000; }
+    #actionHint { margin-top:3px; color:#63806f; text-align:center; font-size:13px; font-weight:900; line-height:1.35; }
+
+    #scoreHud {
+      position:absolute; z-index:12; right:3%; top:29px; width:25%; display:flex; gap:18px; align-items:center; justify-content:space-around;
+      padding:13px 20px; border:4px solid rgba(255,255,255,.74); border-radius:24px;
+      color:var(--ink); background:rgba(255,250,226,.94); box-shadow:0 13px 28px rgba(24,81,60,.2);
+      font-weight:1000; font-size:22px;
+    }
+    #score { color:#de6c2e; } #caught { color:#38874c; }
+    .hud-icon { position:relative; width:45px; height:38px; }
+    .hud-icon.pen { border:7px solid #9b5d35; border-top:0; border-radius:0 0 8px 8px; }
+    .hud-icon.pen::before { content:""; position:absolute; left:7px; right:7px; top:-13px; height:15px; border:6px solid #74442d; border-bottom:0; border-radius:25px 25px 0 0; }
+    .hud-icon.sheep::before { content:""; position:absolute; left:2px; top:8px; width:32px; height:24px; border-radius:50%; background:#f1e8cf; }
+    .hud-icon.sheep::after { content:""; position:absolute; right:0; top:2px; width:19px; height:19px; border-radius:50%; background:#d7b88c; }
+
+    #arena {
+      position:absolute; z-index:4; left:4%; right:4%; top:130px; bottom:35px; touch-action:none; cursor:pointer;
+    }
+    #zoneLabel { position:absolute; top:4%; width:100%; text-align:center; color:rgba(255,252,226,.95); font-size:20px; font-weight:1000; text-shadow:0 3px 8px #386943; }
+    #lane {
+      position:absolute; left:8%; right:7%; top:18%; bottom:4%; overflow:hidden;
+      border-radius:50% 50% 20px 20px; background:linear-gradient(rgba(255,240,168,.12),rgba(113,80,44,.2));
+      clip-path:polygon(39% 0,61% 0,100% 100%,0 100%);
+    }
+    #lane::after { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:5px dashed rgba(255,247,190,.46); }
+
+    .target {
+      position:absolute; z-index:5; width:var(--size); height:calc(var(--size)*.68); transform:translate(-50%,-50%);
+      transition:filter .2s; filter:drop-shadow(0 8px 5px rgba(30,71,43,.22));
+    }
+    .target .body { position:absolute; left:10%; top:22%; width:68%; height:63%; border-radius:55% 48% 45% 50%; background:var(--animal); }
+    .target .head { position:absolute; right:0; top:5%; width:40%; height:48%; border-radius:50%; background:var(--animal); }
+    .target .eye { position:absolute; right:12%; top:19%; width:7px; height:7px; border-radius:50%; background:#173d34; }
+    .target .legs { position:absolute; left:26%; bottom:0; width:44%; height:26%; border-left:8px solid var(--animal-dark); border-right:8px solid var(--animal-dark); }
+    .target .tail { position:absolute; left:1%; top:37%; width:24%; height:9px; border-radius:99px; background:var(--animal-dark); transform:rotate(-45deg); }
+    .target .horn { position:absolute; right:23%; top:-3%; width:16px; height:18px; border:5px solid #765139; border-bottom:0; border-radius:50% 50% 0 0; }
+    .target.small .body::after { content:""; position:absolute; inset:8%; border-radius:50%; background:rgba(255,255,255,.18); }
+    .target.frozen { filter:drop-shadow(0 0 15px #9ff2ff) saturate(.8); }
+    .target.caught { animation:targetCaught .85s ease-out forwards; }
+    .target.rare { filter:drop-shadow(0 0 14px #ffe35c) drop-shadow(0 8px 5px rgba(30,71,43,.22)); }
+    .target.boss { filter:drop-shadow(0 0 22px #ffac39) drop-shadow(0 10px 7px rgba(30,71,43,.3)); }
+    .target.bad .body,.target.bad .head { background:#6c665f; }
+    .target.bad::after { content:"!"; position:absolute; right:-9px; top:-19px; color:#f3543f; font-size:31px; font-weight:1000; text-shadow:0 2px white; }
+    .fruit-target {
+      position:absolute; z-index:6; width:var(--fruit-size); height:var(--fruit-size); border:5px solid #fff3a6; border-radius:50%;
+      transform:translate(-50%,-50%); background:var(--fruit-color); box-shadow:0 8px 7px rgba(40,77,39,.22);
+    }
+    .fruit-target::before { content:""; position:absolute; left:45%; top:-11px; width:19px; height:12px; border-radius:100% 0; background:#439447; transform:rotate(-24deg); }
+    .fruit-target.gold { box-shadow:0 0 20px 7px rgba(255,214,53,.8); animation:goldPulse 1s ease-in-out infinite; }
+    .fruit-target.bad { background:#766f60; border-color:#b9b29e; }
+    .fruit-target.bad::after { content:"×"; display:grid; place-items:center; height:100%; color:#443f36; font-size:27px; font-weight:1000; }
+    .hazard {
+      position:absolute; z-index:6; width:70px; height:88px; transform:translate(-50%,-50%);
+    }
+    .hazard::before { content:""; position:absolute; left:29px; top:17px; width:12px; height:68px; background:#745036; }
+    .hazard::after { content:""; position:absolute; left:4px; top:0; width:62px; height:48px; background:#9a7860; clip-path:polygon(50% 0,100% 35%,76% 100%,50% 69%,24% 100%,0 35%); }
+    #eventBanner {
+      position:absolute; z-index:11; left:50%; top:12%; transform:translateX(-50%);
+      padding:8px 18px; border:3px solid rgba(255,255,255,.78); border-radius:99px; color:#fff7c2;
+      background:rgba(22,76,58,.67); font-weight:1000; opacity:0; transition:.25s; pointer-events:none;
+    }
+    #eventBanner.show { opacity:1; }
+
+    #guideSvg { position:absolute; z-index:7; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+    #guidePath {
+      fill:none; stroke:#fff0a1; stroke-width:5; stroke-linecap:round; stroke-dasharray:10 14;
+      opacity:.78; filter:drop-shadow(0 2px 3px rgba(72,72,30,.28));
+    }
+    #guideGhost {
+      fill:none; stroke:rgba(255,255,255,.2); stroke-width:13; stroke-linecap:round;
+    }
+    #ring {
+      position:absolute; z-index:9; display:none; width:105px; height:48px; border:11px solid #ffbd39; border-radius:50%;
+      transform:translate(-50%,-50%) rotate(-15deg); box-shadow:0 0 9px #fff2a0,0 0 28px rgba(255,178,46,.8); pointer-events:none;
+    }
+    #ring.shadow { box-shadow:0 17px 7px rgba(31,68,40,.25),0 0 9px #fff2a0; }
+    #shockwave {
+      position:absolute; z-index:8; display:none; width:70px; height:32px; border:8px solid #fff08e; border-radius:50%;
+      transform:translate(-50%,-50%); pointer-events:none;
+    }
+    #shockwave.go { display:block; animation:shock 1s ease-out forwards; }
+    #result {
+      position:absolute; z-index:16; left:50%; top:46%; opacity:0; transform:translate(-50%,-50%) scale(.6);
+      padding:12px 25px; border:4px solid white; border-radius:99px; color:var(--ink);
+      background:#fff2a1; font-size:27px; font-weight:1000; pointer-events:none;
+    }
+    #result.show { animation:result 1.05s ease-out; }
+    #pen {
+      position:absolute; z-index:6; right:0; bottom:0; width:230px; height:175px;
+      border:10px solid #8c5332; border-top:0; border-radius:0 0 24px 24px;
+      background:rgba(136,93,49,.13); filter:drop-shadow(0 12px 9px rgba(22,67,39,.25));
+    }
+    #pen::before,#pen::after { content:""; position:absolute; left:-8px; right:-8px; height:11px; background:#b7743e; box-shadow:0 43px #b7743e,0 86px #b7743e; }
+    #pen::before { top:20px; } #pen::after { display:none; }
+    #shed { position:absolute; right:24px; bottom:115px; width:135px; height:95px; background:#bd6741; border:8px solid #75432e; }
+    #shed::before { content:""; position:absolute; left:-18px; right:-18px; top:-52px; height:60px; background:#70412d; clip-path:polygon(50% 0,100% 86%,90% 100%,50% 32%,10% 100%,0 86%); }
+    #penCount { position:absolute; right:2%; bottom:190px; color:var(--cream); font-weight:1000; font-size:19px; text-shadow:0 2px 6px #376743; }
+    .pen-sheep { position:absolute; width:46px; height:31px; }
+    .pen-sheep::before { content:""; position:absolute; left:0; top:7px; width:34px; height:23px; border-radius:50%; background:#f2ead3; }
+    .pen-sheep::after { content:""; position:absolute; right:0; top:1px; width:18px; height:18px; border-radius:50%; background:#cda77c; }
+
+    #chargeDial {
+      position:absolute; z-index:13; left:50%; bottom:2%; width:190px; height:190px; border-radius:50%; transform:translateX(-50%);
+      border:5px solid rgba(255,255,255,.75); background:radial-gradient(circle,#143f34 0 41%,#315d48 42% 63%,rgba(255,255,255,.15) 64%);
+      box-shadow:0 0 28px rgba(64,198,112,.35),inset 0 0 20px rgba(255,255,255,.1);
+    }
+    #chargeArc {
+      position:absolute; inset:12px; border-radius:50%;
+      background:conic-gradient(from -90deg,#77df69 0deg,#77df69 0deg,rgba(255,255,255,.13) 0deg);
+      -webkit-mask:radial-gradient(circle,transparent 0 67%,#000 68%);
+      mask:radial-gradient(circle,transparent 0 67%,#000 68%);
+    }
+    #sweetArc { display:none; }
+    #dialCenter { position:absolute; left:50%; top:50%; width:31px; height:31px; border:7px solid #fff9d4; border-radius:50%; background:#ffae35; transform:translate(-50%,-50%); box-shadow:0 0 15px #ffc84e; }
+    #dialText { position:absolute; left:50%; bottom:25px; transform:translateX(-50%); color:#fff7c1; font-weight:1000; font-size:15px; }
+
+    #control {
+      display:none; position:absolute; z-index:15; left:50%; bottom:5px; transform:translateX(-50%); text-align:center;
+      color:var(--cream); font-weight:900; text-shadow:0 2px 7px #35683f;
+    }
+    #control button { display:none; padding:12px 25px; border:3px solid rgba(255,255,255,.85); border-radius:99px; color:var(--cream);
+      background:rgba(23,77,61,.66); font-size:17px; font-weight:1000; cursor:pointer; touch-action:none; }
+    #phase { margin-top:6px; }
+
+    #intro {
+      position:absolute; z-index:30; inset:0; display:grid; place-items:center; background:rgba(13,65,52,.65); backdrop-filter:blur(8px);
+    }
+    .intro { width:min(650px,82vw); padding:35px 42px; border:5px solid rgba(255,255,255,.82); border-radius:35px; background:var(--cream); text-align:center; color:var(--ink); }
+    .intro h1 { margin:0 0 12px; font-size:38px; }
+    .intro p { font-size:18px; line-height:1.55; }
+    .intro b { color:#dd702f; }
+    .intro button { padding:14px 40px; border:0; border-radius:99px; color:white; background:#e87a35; font-size:21px; font-weight:1000; cursor:pointer; }
+
+    #game.impact { animation:impact .32s linear; }
+    @keyframes shock { from{opacity:1;transform:translate(-50%,-50%) scale(.3)} to{opacity:0;transform:translate(-50%,-50%) scale(8)} }
+    @keyframes result { 0%{opacity:0;transform:translate(-50%,-50%) scale(.5)} 18%,72%{opacity:1;transform:translate(-50%,-50%) scale(1)} 100%{opacity:0;transform:translate(-50%,-65%) scale(1.12)} }
+    @keyframes impact { 0%,100%{transform:none} 25%{transform:translate(-7px,3px)} 50%{transform:translate(7px,-4px)} 75%{transform:translate(-4px,-2px)} }
+    @keyframes goldPulse { 50%{transform:translate(-50%,-50%) scale(1.13)} }
+    @keyframes storm { to{background-position:50px 80px} }
+  </style>
+</head>
+<body>
+<main id="game">
+  <div class="sun"></div><div class="hill a"></div><div class="hill b"></div>
+  <section id="progressHud">
+    <div class="hud-line"><span>训练</span><span id="repCount">第 0 / 36 次</span><span id="stageName">壶铃远投</span></div>
+    <div class="track"><div id="fill"></div><div class="progress-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="progress-labels"><span>节奏训练</span><span>挑战提升</span><span>稳定收尾</span></div>
+  </section>
+  <section id="actionCard" class="card">
+    <div class="card-head"><strong>标准动作</strong><span id="localRep">1 / 12</span></div>
+    <div id="pose"></div>
+    <div id="actionName">壶铃摆动</div>
+    <div id="actionHint"></div>
+  </section>
+  <section id="scoreHud"><i class="hud-icon pen"></i><span id="score">0</span><i class="hud-icon sheep"></i><span id="caught">0</span></section>
+  <section id="arena">
+    <div id="zoneLabel"></div><div id="eventBanner"></div><div id="lane"></div><div id="targets"></div>
+    <svg id="guideSvg" aria-hidden="true"><path id="guideGhost"></path><path id="guidePath"></path></svg>
+    <div id="ring"></div><div id="shockwave"></div><div id="result"></div>
+    <div id="chargeDial"><div id="chargeArc"></div><div id="sweetArc"></div><div id="dialCenter"></div><div id="dialText">蓄力 0%</div></div>
+    <div id="penCount">入栏 0</div><div id="shed"></div><div id="pen"></div>
+  </section>
+  <section id="control"><button id="actionButton">按住场景或空格，松手投圈</button><div id="phase">等待目标进入落点</div></section>
+  <div id="intro"><div class="intro">
+    <h1>农场套圈</h1>
+    <p><b>壶铃组</b>远投大而慢的目标；<b>弯举组</b>近投小而灵的目标；<b>深蹲组</b>把圈砸向地面，落地时同时震住并套取目标。</p>
+    <p>三个动作各 12 次，共 36 reps。按住回车或空格完成去程，松手投圈。</p>
+    <button id="start">开始 Demo</button>
+  </div></div>
+</main>
+<script>
+  const $=s=>document.querySelector(s);
+  const game=$("#game"),arena=$("#arena"),targetLayer=$("#targets"),ring=$("#ring"),button=$("#actionButton");
+  const stages=[
+    {id:"kettle",name:"壶铃组 · 远投",action:"壶铃摆动",hint:"长蓄势 · 大圈 · 远而沉",zone:"远距离 · 大目标缓慢移动",size:112,speed:22,ring:132,ringRatio:.42,flight:980,points:90},
+    {id:"curl",name:"弯举组 · 近投",action:"单臂弯举",hint:"短行程 · 小圈 · 看准后近投",zone:"近距离 · 小目标轻巧移动",size:72,speed:36,ring:82,ringRatio:.68,flight:620,points:130},
+    {id:"squat",name:"深蹲组 · 落地套取",action:"深蹲",hint:"下蹲蓄力 · 松手让圈砸向地面目标",zone:"圈落地时产生震波，并套住附近目标",size:88,speed:25,ring:116,ringRatio:.32,flight:780,points:110}
+  ];
+  const poses={
+    kettle:`<svg viewBox="0 0 260 220"><g fill="none" stroke="#285c4b" stroke-width="18" stroke-linecap="round"><circle cx="130" cy="43" r="24" fill="#285c4b" stroke="none"/><path d="M130 70v67M130 91L72 130M130 91l58 39M130 136l-49 55M130 136l49 55"/></g><path d="M67 142Q118 124 171 104" fill="none" stroke="#f5a62d" stroke-width="11" stroke-linecap="round"/><circle cx="62" cy="144" r="17" fill="#86523a"/></svg>`,
+    curl:`<svg viewBox="0 0 260 220"><g fill="none" stroke="#285c4b" stroke-width="18" stroke-linecap="round"><circle cx="130" cy="43" r="24" fill="#285c4b" stroke="none"/><path d="M130 70v67M130 92L76 125M130 92l53 16M183 108l-22-36M130 136l-45 55M130 136l46 55"/></g><path d="M190 132Q180 101 162 73" fill="none" stroke="#f5a62d" stroke-width="11"/><circle cx="160" cy="69" r="13" fill="#86523a"/></svg>`,
+    squat:`<svg viewBox="0 0 260 220"><g fill="none" stroke="#285c4b" stroke-width="18" stroke-linecap="round"><circle cx="130" cy="43" r="24" fill="#285c4b" stroke="none"/><path d="M130 70v65M130 92L75 119M130 92l55 27M130 134l-48 48M130 134l49 48"/></g><path d="M44 48v116" stroke="#f5a62d" stroke-width="11" stroke-linecap="round"/><path d="M29 145l15 21 15-21" fill="none" stroke="#f5a62d" stroke-width="8"/></svg>`
+  };
+  let stage=0,stageRep=0,total=0,score=0,caught=0,fruit=0,running=false,holding=false,resolving=false;
+  let holdStart=0,charge=.1,last=0,raf=0,targets=[],frozenUntil=0,audio=null;
+  const campaignEvents=[
+    // 1-12: 壶铃远投，建立期待并引入第一批风险
+    {label:"热身 · 两只温顺小羊",animals:2,fruits:2},
+    {label:"果实出现 · 套羊或套果都能得分",animals:3,fruits:3},
+    {label:"连续收获 · 黄金果第一次出现",animals:3,fruits:3,gold:1},
+    {label:"捣乱者出现！灰羊会偷走收获",animals:3,fruits:3,badAnimal:1},
+    {label:"丰收时刻 · 黄金果成串出现",animals:3,fruits:5,gold:2},
+    {label:"小高潮 · 动物与果实成群",animals:5,fruits:5,gold:1},
+    {label:"坏果混入 · 灰色目标需要避开",animals:3,fruits:5,badFruit:2},
+    {label:"稀有动物出现！",animals:4,fruits:4,rare:1},
+    {label:"稻草人诱饵挡住路线",animals:4,fruits:4,hazard:1},
+    {label:"黄金狂热 · 高价值目标增加",animals:5,fruits:6,gold:3,rare:1},
+    {label:"混战 · 好坏目标同时出现",animals:5,fruits:6,gold:2,badFruit:2,badAnimal:1,hazard:1},
+    {label:"远场守门兽 · 第一阶段大型目标",animals:3,fruits:4,gold:1,boss:1},
+    // 13-24: 弯举近投，目标更密、更灵活
+    {label:"进入果园 · 小动物快速穿梭",animals:4,fruits:4},
+    {label:"近场连套 · 三颗果实排成一线",animals:4,fruits:5,gold:1},
+    {label:"调皮兔群冲入果园",animals:6,fruits:3},
+    {label:"坏果第一次成群出现",animals:4,fruits:6,badFruit:2},
+    {label:"稀有金羊闪现 · 目标小而快",animals:5,fruits:5,rare:1},
+    {label:"中局 Fever · 黄金果与动物群",animals:6,fruits:7,gold:3,rare:1},
+    {label:"稻草人挡路 · 窄窗口判断",animals:4,fruits:5,hazard:2},
+    {label:"灰羊抢果 · 好坏目标交叉",animals:6,fruits:6,badAnimal:2,gold:1},
+    {label:"果实暴雨 · 小目标高速穿过",animals:4,fruits:9,gold:2,badFruit:2},
+    {label:"稀有双目标 · 只能优先套一个",animals:6,fruits:5,rare:1,gold:2},
+    {label:"果园大混战 · 风险与奖励同屏",animals:7,fruits:8,gold:2,badFruit:3,badAnimal:2,hazard:1},
+    {label:"果园首领 · 快速大型金羊",animals:5,fruits:6,gold:2,boss:1,rare:1},
+    // 25-36: 深蹲落地套取，暴风危机到最终反转
+    {label:"暴风来临 · 圈落地时会震住目标",animals:5,fruits:5,badFruit:1},
+    {label:"坏果滚入农场 · 落地同时把它们震开",animals:4,fruits:7,badFruit:3},
+    {label:"灰羊成群 · 把圈砸向安全目标",animals:7,fruits:4,badAnimal:3},
+    {label:"雨后黄金果 · 第一次强力反转",animals:5,fruits:7,gold:4},
+    {label:"稻草人阵 · 落地震波会清除诱饵",animals:4,fruits:5,hazard:3},
+    {label:"落地 Fever · 附近目标短暂停住",animals:7,fruits:8,gold:3,rare:1},
+    {label:"危机升级 · 坏果与灰羊同时压境",animals:7,fruits:8,badFruit:3,badAnimal:3},
+    {label:"金色动物回归 · 风暴中的高价值目标",animals:6,fruits:6,gold:2,rare:1},
+    {label:"动物大迁徙 · 一次震住整群",animals:9,fruits:4},
+    {label:"终局前夜 · 黄金果连成一片",animals:6,fruits:10,gold:5,badFruit:2},
+    {label:"最终混战 · 所有目标同时出现",animals:9,fruits:10,gold:4,badFruit:3,badAnimal:3,hazard:2,rare:1},
+    {label:"第 36 次 · 农场之王与黄金果终局",animals:7,fruits:10,gold:5,badFruit:2,boss:1,rare:1}
+  ];
+
+  function current(){return stages[stage]}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+  function setupStage(){
+    const s=current(); $("#stageName").textContent=s.name; $("#actionName").textContent=s.action;
+    $("#actionHint").textContent=s.hint; $("#zoneLabel").textContent=s.zone; $("#pose").innerHTML=poses[s.id];
+    $("#localRep").textContent=`${stageRep+1} / 12`; ring.style.width=`${s.ring}px`; ring.style.height=`${s.ring*s.ringRatio}px`;
+    ring.style.borderWidth=s.id==="squat"?"14px":s.id==="curl"?"8px":"11px";
+    game.classList.toggle("act2",total>=12&&total<24);
+    game.classList.toggle("act3",total>=24);
+    spawnTargets();
+    requestAnimationFrame(updateGuide);
+  }
+  function spawnTargets(){
+    targetLayer.innerHTML=""; targets=[];
+    const event=campaignEvents[total];
+    showEvent(event.label);
+    for(let i=0;i<event.animals;i++){
+      const el=document.createElement("div"),size=current().size*(.86+Math.random()*.24);
+      const isBad=i<Number(event.badAnimal||0),isRare=i===event.animals-1&&event.rare,isBoss=i===event.animals-1&&event.boss;
+      el.className=`target ${current().id==="curl"?"small":""} ${isBad?"bad":""} ${isRare?"rare":""} ${isBoss?"boss":""}`;
+      const finalSize=isBoss?size*1.55:size;
+      el.style.setProperty("--size",`${finalSize}px`); el.style.setProperty("--animal",isRare?"#ffe084":["#f5e3b5","#e8a761","#ece9d8","#c98d63"][i%4]);
+      el.style.setProperty("--animal-dark","#795039");
+      el.innerHTML=`<i class="tail"></i><i class="body"></i><i class="head"></i><i class="eye"></i><i class="horn"></i><i class="legs"></i>`;
+      const depth=current().id==="kettle" ? .2+(i%4)*.115 : current().id==="curl" ? .54+(i%5)*.065 : .57+(i%4)*.075;
+      const t={el,type:"animal",bad:isBad,rare:isRare,boss:isBoss,x:16+Math.random()*70,y:depth*100,v:(Math.random()<.5?-1:1)*current().speed*(.8+Math.random()*.4),size:finalSize};
+      targetLayer.appendChild(el);targets.push(t);
+    }
+    for(let i=0;i<event.fruits;i++) spawnFruit(i,event);
+    for(let i=0;i<(event.hazard||0);i++) spawnHazard();
+    updateTargets();
+  }
+  function spawnFruit(i,event){
+    const el=document.createElement("div"),bad=i<Number(event.badFruit||0),gold=i>=event.fruits-Number(event.gold||0);
+    const size=current().id==="curl"?40:46;
+    el.className=`fruit-target ${bad?"bad":""} ${gold?"gold":""}`;
+    el.style.setProperty("--fruit-size",`${size}px`);el.style.setProperty("--fruit-color",["#ef5543","#f7b832","#f1842e"][i%3]);
+    const speedVariation=current().id==="kettle" ? 1+Math.random()*.45 : .88+Math.random()*.3;
+    const t={el,type:"fruit",bad,gold,x:14+Math.random()*72,y:((current().id==="kettle" ? .22 : .48)+Math.random()*.28)*100,v:(Math.random()<.5?-1:1)*current().speed*speedVariation,size};
+    targetLayer.appendChild(el);targets.push(t);
+  }
+  function spawnHazard(){
+    const el=document.createElement("div");el.className="hazard";
+    const t={el,type:"hazard",bad:true,x:25+Math.random()*50,y:48+Math.random()*27,v:0,size:70};
+    targetLayer.appendChild(el);targets.push(t);
+  }
+  function showEvent(text){
+    const banner=$("#eventBanner");banner.textContent=text;banner.classList.add("show");setTimeout(()=>banner.classList.remove("show"),2100);
+  }
+  function updateTargets(){
+    targets.forEach(t=>{t.el.style.left=`${t.x}%`;t.el.style.top=`${t.y}%`});
+  }
+  function loop(ts){
+    if(!running)return; const dt=Math.min(32,ts-(last||ts));last=ts;
+    if(!resolving){
+      const fatigueEase=total>=24?.72:total>=12?.82:1;
+      targets.forEach(t=>{if(ts<frozenUntil)return;t.x+=t.v*fatigueEase*dt/1000;if(t.x<12||t.x>88){t.v*=-1;t.x=clamp(t.x,12,88)}});
+      updateTargets();
+    }
+    if(holding){
+      charge=clamp((ts-holdStart)/850,.08,1);
+      $("#phase").textContent=`蓄势 ${Math.round(charge*100)}%`;
+      paintCharge();
+      $("#dialText").textContent=`蓄力 ${Math.round(charge*100)}%`;
+      updateGuide();
+    }
+    raf=requestAnimationFrame(loop);
+  }
+  function launchGeometry(power=charge){
+    const w=arena.clientWidth,h=arena.clientHeight;
+    const dialRect=$("#chargeDial").getBoundingClientRect(),arenaRect=arena.getBoundingClientRect();
+    const start={x:dialRect.left-arenaRect.left+dialRect.width/2,y:dialRect.top-arenaRect.top+dialRect.height/2};
+    if(current().id==="kettle"){
+      const dest={x:w*.5,y:h*(.6-power*.38)};
+      return{start,dest,control:{x:w*.5,y:h*(.56-power*.58)}};
+    }
+    if(current().id==="curl"){
+      const side=stageRep%2===0?-1:1;
+      const dest={x:w*(.5+side*(.1+.12*power)),y:h*(.72-power*.12)};
+      return{start,dest,control:{x:w*(.5+side*.12),y:h*(.68-power*.2)}};
+    }
+    const dest={x:w*.5,y:h*(.59+.13*power)};
+    return{start,dest,control:{x:w*.5,y:h*(.7+.04*power)}};
+  }
+  function updateGuide(){
+    const g=launchGeometry(holding?charge:.72);
+    const d=`M ${g.start.x} ${g.start.y} Q ${g.control.x} ${g.control.y} ${g.dest.x} ${g.dest.y}`;
+    $("#guidePath").setAttribute("d",d);$("#guideGhost").setAttribute("d",d);
+  }
+  function paintCharge(){
+    const degrees=Math.round(charge*360);
+    $("#chargeArc").style.background=`conic-gradient(from -90deg,#76df69 0deg,#ffe05e ${Math.max(1,degrees*.72)}deg,#ff9d36 ${degrees}deg,rgba(255,255,255,.13) ${degrees}deg)`;
+  }
+  function begin(e){if(!running||holding||resolving)return;e?.preventDefault();holding=true;holdStart=performance.now();charge=.08;paintCharge();button.textContent="保持动作… 松手释放";tone(240,.05)}
+  function end(e){
+    if(!holding)return;e?.preventDefault();holding=false;resolving=true;button.textContent="投掷中…";
+    const destination=launchGeometry(charge).dest;
+    if(current().id==="squat")doSquatThrow(destination);else doArcThrow(destination);
+  }
+  function doArcThrow(dest){
+    const geometry=launchGeometry(charge),start=geometry.start,duration=current().flight;
+    ring.style.display="block";ring.classList.add("shadow");const launched=performance.now();
+    function fly(now){
+      const p=clamp((now-launched)/duration,0,1),q=1-p;
+      const x=q*q*start.x+2*q*p*geometry.control.x+p*p*dest.x;
+      const y=q*q*start.y+2*q*p*geometry.control.y+p*p*dest.y;
+      ring.style.left=`${x}px`;ring.style.top=`${y}px`;
+      const spin=current().id==="kettle"?620:current().id==="curl"?310:220;
+      const scale=current().id==="kettle"?.48+p*.52:.72+p*.28;
+      ring.style.transform=`translate(-50%,-50%) rotate(${p*spin-18}deg) scale(${scale})`;
+      if(p<1)requestAnimationFrame(fly);else settle(dest);
+    }requestAnimationFrame(fly);
+  }
+  function doSquatThrow(dest){
+    const geometry=launchGeometry(charge),started=performance.now();
+    ring.style.display="block";ring.classList.add("shadow");
+    ring.style.left=`${geometry.start.x}px`;ring.style.top=`${geometry.start.y}px`;
+    function slam(now){
+      const p=clamp((now-started)/current().flight,0,1),q=1-p;
+      const x=q*q*geometry.start.x+2*q*p*geometry.control.x+p*p*dest.x;
+      const y=q*q*geometry.start.y+2*q*p*geometry.control.y+p*p*dest.y;
+      ring.style.left=`${x}px`;ring.style.top=`${y}px`;
+      ring.style.transform=`translate(-50%,-50%) rotate(${p*120}deg) scale(${.72+p*.42})`;
+      if(p<1)return requestAnimationFrame(slam);
+
+      frozenUntil=performance.now()+1250;
+      targets.forEach(t=>t.el.classList.add("frozen"));
+      const wave=$("#shockwave");
+      wave.style.left=`${dest.x}px`;wave.style.top=`${dest.y}px`;
+      wave.classList.remove("go");void wave.offsetWidth;wave.classList.add("go");
+      const cleared=targets.filter(t=>t.bad&&Math.hypot(dest.x-arena.clientWidth*t.x/100,dest.y-arena.clientHeight*t.y/100)<190);
+      cleared.forEach((t,i)=>setTimeout(()=>{t.bad=false;t.el.style.opacity=".18";t.el.style.transform="translate(-50%,-50%) scale(.4)";},i*70));
+      impact();tone(120,.22);
+      if(cleared.length)showResult(`落地震开 ${cleared.length} 个坏目标`);
+      setTimeout(()=>settle(dest),260);
+    }
+    requestAnimationFrame(slam);
+  }
+  function settle(dest){
+    ring.style.left=`${dest.x}px`;ring.style.top=`${dest.y}px`;
+    const hit=targets.map(t=>({t,d:Math.hypot(dest.x-arena.clientWidth*t.x/100,dest.y-arena.clientHeight*t.y/100)})).sort((a,b)=>a.d-b.d)[0];
+    const threshold=(current().ring+hit.t.size)*.34;
+    if(hit&&hit.d<threshold){
+      const perfect=hit.d<threshold*.48,earned=Math.round(current().points*(perfect?1.6:1)*(1+charge*.45));
+      if(hit.t.bad){
+        score=Math.max(0,score-60);showResult(hit.t.type==="hazard"?"套中诱饵 -60":"坏目标逃走了 -60");tone(180,.18);impact();
+      }else if(hit.t.type==="animal"){
+        const animalEarned=Math.round(earned*(hit.t.rare?1.8:hit.t.boss?2.5:1));
+        score+=animalEarned;caught++;showResult(hit.t.boss?`Boss 入栏 +${animalEarned}`:hit.t.rare?`稀有动物 +${animalEarned}`:`${perfect?"完美套中":"套中了"} +${animalEarned}`);
+        tone(hit.t.boss?1060:perfect?880:650,.2);impact();sendToPen(hit.t,perfect||hit.t.rare||hit.t.boss);
+      }else{
+        const fruitEarned=Math.round(earned*(hit.t.gold?2.2:1));
+        score+=fruitEarned;fruit+=hit.t.gold?3:1;showResult(hit.t.gold?`黄金果 +${fruitEarned}`:`果实收获 +${fruitEarned}`);
+        tone(hit.t.gold?980:720,.18);sendFruitHome(hit.t,hit.t.gold);
+      }
+    }else{
+      score+=20;showResult("擦边奖励 +20");tone(330,.12);
+    }
+    $("#score").textContent=score;$("#caught").textContent=caught;$("#penCount").textContent=`入栏 ${caught}`;
+    const resultPause=total>=24?1350:total>=12?1150:950;
+    setTimeout(()=>{ring.style.display="none";targets.forEach(t=>t.el.classList.remove("frozen"));completeRep()},resultPause);
+  }
+  function sendToPen(t,perfect){
+    const clone=t.el.cloneNode(true),pen=$("#pen");
+    clone.classList.remove("caught","frozen");clone.style.left=`${t.x}%`;clone.style.top=`${t.y}%`;clone.style.width=`${t.size}px`;clone.style.height=`${t.size*.68}px`;
+    clone.style.transition="left .85s cubic-bezier(.3,.1,.7,1),top .85s cubic-bezier(.3,.1,.7,1),transform .85s,opacity .85s";
+    targetLayer.appendChild(clone);t.el.style.opacity=".15";
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      clone.style.left="91%";clone.style.top="84%";clone.style.transform="translate(-50%,-50%) scale(.42) rotate(12deg)";
+    }));
+    setTimeout(()=>{
+      clone.remove();
+      const sheep=document.createElement("i");sheep.className="pen-sheep";
+      const index=pen.querySelectorAll(".pen-sheep").length;
+      sheep.style.left=`${16+(index%4)*47}px`;sheep.style.bottom=`${13+Math.floor(index/4)*42}px`;
+      if(perfect)sheep.style.filter="drop-shadow(0 0 8px #ffd74b)";
+      pen.appendChild(sheep);
+      showResult(perfect?"金圈羊入栏！":"小羊入栏！");
+    },900);
+  }
+  function sendFruitHome(t,gold){
+    const clone=t.el.cloneNode(true);
+    clone.style.left=`${t.x}%`;clone.style.top=`${t.y}%`;
+    clone.style.transition="left .75s cubic-bezier(.25,.8,.3,1),top .75s cubic-bezier(.25,.8,.3,1),transform .75s,opacity .75s";
+    targetLayer.appendChild(clone);t.el.style.opacity=".15";
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      clone.style.left="90%";clone.style.top="78%";clone.style.transform="translate(-50%,-50%) scale(.4) rotate(450deg)";
+    }));
+    setTimeout(()=>{clone.remove();showResult(gold?"黄金果送到牧场！":"果实送到饲料槽！")},780);
+  }
+  function completeRep(){
+    total++;stageRep++;$("#repCount").textContent=`第 ${total} / 36 次`;$("#fill").style.width=`${total/36*100}%`;
+    if(total>=36)return finish();
+    if(stageRep>=12){stage++;stageRep=0;setupStage()}else{ $("#localRep").textContent=`${stageRep+1} / 12`;spawnTargets(); }
+    resolving=false;button.textContent="按住场景或空格，松手投圈";$("#phase").textContent="等待目标进入落点";
+    charge=0;paintCharge();$("#dialText").textContent="蓄力 0%";updateGuide();
+  }
+  function showResult(text){const r=$("#result");r.textContent=text;r.classList.remove("show");void r.offsetWidth;r.classList.add("show")}
+  function impact(){game.classList.remove("impact");void game.offsetWidth;game.classList.add("impact");setTimeout(()=>game.classList.remove("impact"),340)}
+  function tone(freq,d=.1){if(!audio)return;const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;g.gain.setValueAtTime(.06,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+d)}
+  function start(){audio=new(window.AudioContext||window.webkitAudioContext)();$("#intro").style.display="none";running=true;setupStage();last=performance.now();raf=requestAnimationFrame(loop)}
+  function finish(){running=false;cancelAnimationFrame(raf);$("#intro").style.display="grid";document.querySelector(".intro").innerHTML=`<h1>套圈完成</h1><p>36 reps 完成，套中 <b>${caught}</b> 个目标，总收获 <b>${score}</b>。</p><button onclick="location.reload()">再玩一次</button>`}
+  $("#start").onclick=start;arena.addEventListener("pointerdown",begin);button.addEventListener("pointerdown",begin);window.addEventListener("pointerup",end);
+  window.addEventListener("keydown",e=>{if((e.code==="Space"||e.code==="Enter")&&!e.repeat)begin(e)});
+  window.addEventListener("keyup",e=>{if(e.code==="Space"||e.code==="Enter")end(e)});
+  window.addEventListener("resize",updateGuide);
+</script>
+</body>
+</html>
