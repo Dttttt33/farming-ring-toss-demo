@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ROM · Speed · CoP Ring Options</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #24473c;
+      --muted: #6e7f71;
+      --cream: #f5efdf;
+      --panel: #fffaf0;
+      --track: #ded9c8;
+      --rom: #f3a82f;
+      --rom-light: #ffd976;
+      --good: #71c96d;
+      --good-dark: #2f8a50;
+      --bad: #e56c55;
+      --shadow: rgba(44, 72, 53, .16);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255,255,255,.8), transparent 34%),
+        linear-gradient(145deg, #eee5ce, var(--cream));
+      font-family: ui-rounded, "SF Pro Rounded", "PingFang SC", system-ui, sans-serif;
+    }
+
+    main { width: min(1380px, 96vw); margin: 0 auto; padding: 34px 0 48px; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+    h1 { margin: 0 0 7px; font-size: clamp(27px, 3vw, 44px); letter-spacing: -.04em; }
+    header p { margin: 0; color: var(--muted); font-weight: 650; }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; font-weight: 850; }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .legend i { width: 11px; height: 11px; border-radius: 50%; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: auto minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
+      gap: 18px;
+      align-items: center;
+      padding: 17px 20px;
+      margin-bottom: 22px;
+      border: 1px solid rgba(71, 99, 74, .13);
+      border-radius: 24px;
+      background: rgba(255, 250, 240, .82);
+      box-shadow: 0 15px 35px var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    button {
+      border: 0;
+      border-radius: 16px;
+      padding: 13px 20px;
+      color: white;
+      background: var(--ink);
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 8px 15px rgba(36,71,60,.2);
+    }
+    button:active { transform: translateY(1px); }
+    label { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; font-weight: 850; }
+    label output { color: var(--good-dark); }
+    input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--good-dark); }
+
+    .grid { display: grid; place-items: center; }
+    .card {
+      position: relative;
+      overflow: hidden;
+      width: min(560px, 100%);
+      min-height: 570px;
+      padding: 22px;
+      border: 1px solid rgba(71, 99, 74, .13);
+      border-radius: 30px;
+      background: var(--panel);
+      box-shadow: 0 18px 42px var(--shadow);
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: auto -80px -95px;
+      height: 220px;
+      border-radius: 50%;
+      opacity: .28;
+      background: #9bca72;
+    }
+    .card-head { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 16px; }
+    .option { color: var(--rom); font-size: 12px; font-weight: 1000; letter-spacing: .15em; }
+    h2 { margin: 4px 0 5px; font-size: 23px; letter-spacing: -.03em; }
+    .description { max-width: 320px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; font-weight: 650; }
+    .status {
+      align-self: start;
+      min-width: 78px;
+      padding: 7px 10px;
+      border: 2px solid var(--good);
+      border-radius: 999px;
+      color: var(--good-dark);
+      background: #effbea;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 1000;
+      transition: .2s ease;
+    }
+    .status.bad { color: #a94739; border-color: var(--bad); background: #fff0e9; }
+
+    .dial-wrap {
+      position: relative;
+      z-index: 1;
+      width: min(350px, 100%);
+      aspect-ratio: 1;
+      margin: 30px auto 13px;
+      filter: drop-shadow(0 14px 13px rgba(47,80,55,.15));
+    }
+    svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .track, .progress, .pace, .actual, .ticks { fill: none; transform: rotate(-90deg); transform-origin: 180px 180px; }
+    .track { stroke: var(--track); stroke-width: 42; }
+    .progress { stroke: url(#romGradient); stroke-width: 42; stroke-linecap: round; }
+    .pace { stroke: var(--good); stroke-width: 50; stroke-linecap: round; opacity: .9; }
+    .actual { stroke: white; stroke-width: 12; stroke-linecap: round; filter: drop-shadow(0 2px 3px rgba(26,71,48,.55)); }
+    .ticks { stroke: rgba(255,255,255,.72); stroke-width: 3; stroke-dasharray: 2 25.4; }
+
+    .cop-plate { fill: #e8eadb; stroke: #c8cfbb; stroke-width: 2; }
+    .cop-safe { fill: rgba(113,201,109,.18); stroke: rgba(47,138,80,.5); stroke-width: 2; stroke-dasharray: 4 5; }
+    .cop-cross { stroke: rgba(36,71,60,.18); stroke-width: 2; }
+    .cop-dot { fill: var(--good-dark); stroke: white; stroke-width: 5; filter: drop-shadow(0 5px 5px rgba(36,71,60,.24)); }
+    .cop-trail { fill: none; stroke: rgba(47,138,80,.28); stroke-width: 7; stroke-linecap: round; }
+    .center-label { fill: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .1em; text-anchor: middle; }
+
+    .readout { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .metric { padding: 10px 9px; border-radius: 15px; background: rgba(239,235,219,.8); text-align: center; }
+    .metric small { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .09em; }
+    .metric b { font-size: 15px; }
+
+    .petal-bloom { transform-origin: 180px 180px; transition: transform .25s ease; }
+    .completion-halo {
+      fill: none;
+      stroke: #ffd75f;
+      stroke-width: 8;
+      opacity: 0;
+      transform-origin: 180px 180px;
+    }
+    .completion-halo.complete { animation: completeHalo .9s ease-out; }
+    .pace-glow { transition: opacity .2s ease; }
+    .tutorial-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .tutorial-tag {
+      position: absolute;
+      width: 238px;
+      padding: 10px 14px;
+      border: 2px solid rgba(255,255,255,.92);
+      border-radius: 999px;
+      color: white;
+      background: rgba(36,71,60,.93);
+      box-shadow: 0 14px 35px rgba(36,71,60,.28);
+      font-size: 13px;
+      font-weight: 950;
+      line-height: 1.42;
+      white-space: normal;
+      opacity: 0;
+      transform: translateY(6px) scale(.92);
+      transition: opacity .25s ease, transform .25s ease;
+      backdrop-filter: blur(8px);
+    }
+    .tutorial-tag::after {
+      content: "";
+      position: absolute;
+      width: 34px;
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(36,71,60,.68);
+      transform-origin: left center;
+    }
+    .tutorial-tag.show { opacity: 1; transform: translateY(0) scale(1); }
+    .tutorial-tag.speed { right: -32px; top: 50px; }
+    .tutorial-tag.speed::after { right: 92%; top: 100%; transform: rotate(137deg); }
+    .tutorial-tag.rom { left: -28px; bottom: 62px; }
+    .tutorial-tag.rom::after { left: 88%; bottom: 100%; transform: rotate(-45deg); }
+    .tutorial-tag.cop { right: -25px; bottom: 96px; }
+    .tutorial-tag.cop::after { right: 92%; bottom: 100%; transform: rotate(213deg); }
+    .tutorial-pulse {
+      position: absolute;
+      z-index: 3;
+      border: 5px solid white;
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 0 0 8px rgba(113,201,109,.22), 0 0 28px rgba(113,201,109,.85);
+    }
+    .tutorial-pulse.show { animation: tutorialPulse 1s ease-in-out infinite; }
+    .tutorial-pulse.ring { inset: 15px; }
+    .tutorial-pulse.center { width: 145px; height: 145px; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+    .quality-badge {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      z-index: 3;
+      min-width: 170px;
+      padding: 12px 18px;
+      border: 3px solid white;
+      border-radius: 999px;
+      color: white;
+      background: var(--good-dark);
+      box-shadow: 0 10px 25px rgba(36,71,60,.28);
+      text-align: center;
+      font-size: 20px;
+      font-weight: 1000;
+      letter-spacing: .08em;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(.7);
+      pointer-events: none;
+    }
+    .quality-badge.show { animation: qualityPop 1.05s ease both; }
+    .quality-badge.good { background: #e9a42e; }
+    .quality-badge.retry { background: var(--bad); }
+
+    @keyframes completeHalo {
+      0% { opacity: .95; transform: scale(.88); }
+      100% { opacity: 0; transform: scale(1.16); }
+    }
+    @keyframes qualityPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
+      18%, 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -58%) scale(1.08); }
+    }
+    @keyframes tutorialPulse {
+      0%,100% { opacity: .28; }
+      50% { opacity: .95; }
+    }
+
+    .callout {
+      position: relative;
+      z-index: 2;
+      margin: 13px 0 0;
+      padding: 12px 14px;
+      border-radius: 15px;
+      color: #476255;
+      background: rgba(236, 244, 218, .82);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .card { min-height: 530px; }
+      .controls { grid-template-columns: 1fr; }
+      header { align-items: start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>ROM × Speed Ring</h1>
+      <p>一条环完成一次 rep：金色是 ROM，绿色是标准节奏，白点是你的实际位置。</p>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--rom)"></i>ROM 路径</span>
+      <span><i style="background:var(--good)"></i>目标速度窗口</span>
+      <span><i style="background:white;border:1px solid #aaa"></i>实际位置</span>
+      <span><i style="background:var(--good-dark)"></i>CoP</span>
+    </div>
+  </header>
+
+  <section class="controls">
+    <button id="toggle">暂停 Demo</button>
+    <label>你的动作速度 <output id="speedOut">标准</output>
+      <input id="speed" type="range" min="45" max="155" value="100">
+    </label>
+    <label>CoP 稳定度 <output id="stabilityOut">82%</output>
+      <input id="stability" type="range" min="10" max="100" value="82">
+    </label>
+    <label>目标窗口宽度 <output id="windowOut">18%</output>
+      <input id="window" type="range" min="8" max="30" value="18">
+    </label>
+  </section>
+
+  <section class="grid" id="grid"></section>
+</main>
+
+<script>
+  const NS = "http://www.w3.org/2000/svg";
+  const circumference = 2 * Math.PI * 142;
+  const state = {
+    running: true,
+    actual: 0,
+    target: 0,
+    speed: 1,
+    stability: .82,
+    window: .18,
+    last: performance.now(),
+    holdUntil: 0,
+    resultShown: false,
+    paceSamples: 0,
+    paceHits: 0
+  };
+
+  const options = [
+    {
+      id: "a",
+      label: "SINGLE RING",
+      name: "ROM · Speed · Stability",
+      description: "绿色窗口走到顶部后停止。白点留在窗口中，同时保持中心 CoP 稳定。",
+      callout: "完成评价同时看三件事：ROM 是否到位、速度是否跟住绿色窗口、CoP 是否稳定。"
+    }
+  ];
+
+  function svgMarkup(id) {
+    return `
+      <svg viewBox="0 0 360 360" aria-label="ROM speed CoP animated dial">
+        <defs>
+          <linearGradient id="romGradient-${id}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffd976"/>
+            <stop offset=".55" stop-color="#f3a82f"/>
+            <stop offset="1" stop-color="#e9782f"/>
+          </linearGradient>
+          <filter id="soft-${id}"><feGaussianBlur stdDeviation="4"/></filter>
+        </defs>
+        <g class="petal-bloom">
+          <circle class="completion-halo" cx="180" cy="180" r="160"/>
+          <circle class="track" cx="180" cy="180" r="142"/>
+          <circle class="pace pace-glow" cx="180" cy="180" r="142" opacity=".22" filter="url(#soft-${id})"/>
+          <circle class="pace" cx="180" cy="180" r="142"/>
+          <circle class="progress" cx="180" cy="180" r="142" style="stroke:url(#romGradient-${id})"/>
+          <circle class="ticks" cx="180" cy="180" r="142"/>
+          <circle class="actual" cx="180" cy="180" r="142"/>
+        </g>
+        <circle class="cop-plate" cx="180" cy="180" r="72"/>
+        <circle class="cop-safe" cx="180" cy="180" r="37"/>
+        <path class="cop-cross" d="M108 180h144M180 108v144"/>
+        <path class="cop-trail" d="M180 180 Q180 180 180 180"/>
+        <circle class="cop-dot" cx="180" cy="180" r="10"/>
+      </svg>`;
+  }
+
+  const grid = document.querySelector("#grid");
+  grid.innerHTML = options.map(option => `
+    <article class="card option-${option.id}" data-option="${option.id}">
+      <div class="card-head">
+        <div>
+          <div class="option">${option.label}</div>
+          <h2>${option.name}</h2>
+          <p class="description">${option.description}</p>
+        </div>
+        <div class="status">速度合适</div>
+      </div>
+      <div class="dial-wrap">
+        ${svgMarkup(option.id)}
+        <div class="tutorial-pulse ring"></div>
+        <div class="tutorial-pulse center"></div>
+        <div class="tutorial-overlay">
+          <div class="tutorial-tag speed">让白色游标跟随绿色区域，保持合适的动作速度</div>
+          <div class="tutorial-tag rom">橙色进度代表你已完成的动作幅度</div>
+          <div class="tutorial-tag cop">让中心点保持在靶心附近，维持身体稳定</div>
+        </div>
+        <div class="quality-badge">PERFECT REP</div>
+      </div>
+      <div class="readout">
+        <div class="metric"><small>ROM</small><b class="rom-read">0%</b></div>
+        <div class="metric"><small>SPEED</small><b class="speed-read">标准</b></div>
+        <div class="metric"><small>CoP</small><b class="cop-read">稳定</b></div>
+      </div>
+      <p class="callout">${option.callout}</p>
+    </article>
+  `).join("");
+
+  const dialWrap = document.querySelector(".dial-wrap");
+  const tutorialRing = document.querySelector(".tutorial-pulse.ring");
+  const tutorialCenter = document.querySelector(".tutorial-pulse.center");
+  const tutorialSteps = [
+    {tag:"speed", focus:"ring"},
+    {tag:"rom", focus:"ring"},
+    {tag:"cop", focus:"center"}
+  ];
+  let tutorialStep = 0;
+  function showTutorialStep() {
+    const step = tutorialSteps[tutorialStep];
+    const tag = document.querySelector(`.tutorial-tag.${step.tag}`);
+    tutorialRing.classList.toggle("show", step.focus === "ring");
+    tutorialCenter.classList.toggle("show", step.focus === "center");
+    tag.classList.add("show");
+    window.setTimeout(() => {
+      tag.classList.remove("show");
+      tutorialRing.classList.remove("show");
+      tutorialCenter.classList.remove("show");
+      tutorialStep++;
+      if (tutorialStep < tutorialSteps.length) window.setTimeout(showTutorialStep, 250);
+    }, 2300);
+  }
+  window.setTimeout(showTutorialStep, 500);
+
+  function dashForArc(start, length) {
+    const safeLength = Math.max(.002, Math.min(.999, length));
+    const safeStart = Math.max(0, Math.min(1, start));
+    return {
+      dasharray: `${circumference * safeLength} ${circumference * (1 - safeLength)}`,
+      dashoffset: -circumference * safeStart
+    };
+  }
+
+  function render(now) {
+    const dt = Math.min(40, now - state.last);
+    state.last = now;
+
+    if (state.running) {
+      if (state.holdUntil) {
+        if (now >= state.holdUntil) {
+          state.target = 0;
+          state.actual = 0;
+          state.holdUntil = 0;
+          state.resultShown = false;
+          state.paceSamples = 0;
+          state.paceHits = 0;
+        }
+      } else {
+        const baseRate = .105;
+        state.target = Math.min(1, state.target + baseRate * dt / 1000);
+        state.actual = Math.min(1, state.actual + baseRate * state.speed * dt / 1000);
+        if (state.target >= 1) {
+          state.target = 1;
+          state.holdUntil = now + 1450;
+        }
+      }
+    }
+
+    const halfWindow = state.window / 2;
+    const windowStart = Math.min(1 - state.window, Math.max(0, state.target - halfWindow));
+    const windowEnd = windowStart + state.window;
+    const delta = state.actual - state.target;
+    const onPace = state.actual >= windowStart && state.actual <= windowEnd;
+    if (state.running && !state.holdUntil) {
+      state.paceSamples++;
+      if (onPace) state.paceHits++;
+    }
+    const rom = state.actual;
+    const actualSpeedLabel = state.speed < .86 ? "偏慢" : state.speed > 1.14 ? "偏快" : "标准";
+    const copLabel = state.stability > .72 ? "稳定" : state.stability > .45 ? "晃动" : "失稳";
+    const wobble = (1 - state.stability) * 49;
+    const copX = 180 + Math.sin(now / 310) * wobble * .72 + Math.sin(now / 117) * wobble * .18;
+    const copY = 180 + Math.cos(now / 390) * wobble * .55 + Math.cos(now / 143) * wobble * .2;
+    document.querySelectorAll(".card").forEach(card => {
+      const courseLength = 1;
+      const targetArc = dashForArc(windowStart * courseLength, state.window * courseLength);
+      const progressArc = dashForArc(0, Math.max(.003, rom * courseLength));
+      const markerArc = dashForArc(Math.max(0, state.actual * courseLength - .006), .012);
+      const pace = card.querySelectorAll(".pace");
+      pace.forEach(el => {
+        el.style.strokeDasharray = targetArc.dasharray;
+        el.style.strokeDashoffset = targetArc.dashoffset;
+      });
+      const progress = card.querySelector(".progress");
+      progress.style.strokeDasharray = progressArc.dasharray;
+      progress.style.strokeDashoffset = progressArc.dashoffset;
+      const actual = card.querySelector(".actual");
+      actual.style.strokeDasharray = markerArc.dasharray;
+      actual.style.strokeDashoffset = markerArc.dashoffset;
+      actual.style.stroke = onPace ? "white" : "var(--bad)";
+      card.querySelector(".pace-glow").style.opacity = onPace ? ".28" : ".08";
+
+      card.querySelector(".cop-dot").setAttribute("cx", copX);
+      card.querySelector(".cop-dot").setAttribute("cy", copY);
+      card.querySelector(".cop-dot").style.fill = state.stability > .45 ? "var(--good-dark)" : "var(--bad)";
+      card.querySelector(".cop-trail").setAttribute("d", `M180 180 Q${180 + (copX-180)*.35} ${180 + (copY-180)*.35} ${copX} ${copY}`);
+      const status = card.querySelector(".status");
+      status.textContent = onPace ? "速度合适" : delta > 0 ? "放慢一点" : "再快一点";
+      status.classList.toggle("bad", !onPace);
+      card.querySelector(".rom-read").textContent = `${Math.round(rom * 100)}%`;
+      card.querySelector(".speed-read").textContent = actualSpeedLabel;
+      card.querySelector(".cop-read").textContent = copLabel;
+
+      card.querySelector(".petal-bloom").style.transform = `scale(${1 + (onPace ? .008 : 0)})`;
+
+      if (state.holdUntil && !state.resultShown) {
+        state.resultShown = true;
+        const paceScore = state.paceSamples ? state.paceHits / state.paceSamples : 0;
+        const completeRom = state.actual > .92;
+        const perfect = completeRom && paceScore > .72 && state.stability > .72;
+        const good = completeRom && paceScore > .48 && state.stability > .45;
+        const badge = card.querySelector(".quality-badge");
+        badge.textContent = perfect ? "PERFECT REP" : good ? "GOOD REP" : "TRY AGAIN";
+        badge.className = `quality-badge ${perfect ? "" : good ? "good" : "retry"}`;
+        void badge.offsetWidth;
+        badge.classList.add("show");
+        const halo = card.querySelector(".completion-halo");
+        halo.classList.remove("complete");
+        void halo.getBBox();
+        halo.classList.add("complete");
+      }
+    });
+
+    requestAnimationFrame(render);
+  }
+
+  document.querySelector("#toggle").addEventListener("click", event => {
+    state.running = !state.running;
+    event.currentTarget.textContent = state.running ? "暂停 Demo" : "继续 Demo";
+  });
+
+  document.querySelector("#speed").addEventListener("input", event => {
+    state.speed = Number(event.target.value) / 100;
+    document.querySelector("#speedOut").textContent =
+      state.speed < .86 ? "偏慢" : state.speed > 1.14 ? "偏快" : "标准";
+  });
+
+  document.querySelector("#stability").addEventListener("input", event => {
+    state.stability = Number(event.target.value) / 100;
+    document.querySelector("#stabilityOut").textContent = `${event.target.value}%`;
+  });
+
+  document.querySelector("#window").addEventListener("input", event => {
+    state.window = Number(event.target.value) / 100;
+    document.querySelector("#windowOut").textContent = `${event.target.value}%`;
+  });
+
+  requestAnimationFrame(render);
+</script>
+</body>
+</html>
