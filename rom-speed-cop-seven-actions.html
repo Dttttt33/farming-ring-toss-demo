@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>7 Actions · 3D ROM × Speed × CoP</title>
+  <style>
+    :root {
+      --ink:#24473c; --muted:#718176; --cream:#f2ebd9; --panel:#fffaf0;
+      --track:#d8d5c7; --down:#4f8fc7; --up:#f0a12e; --hold:#8a68bb;
+      --speed:#78d36f; --bad:#e66552; --shadow:rgba(42,70,51,.16);
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; min-height:100vh; color:var(--ink);
+      background:radial-gradient(circle at 15% 0%,rgba(255,255,255,.86),transparent 30%),linear-gradient(145deg,#e9dfc6,var(--cream));
+      font-family:ui-rounded,"SF Pro Rounded","PingFang SC",system-ui,sans-serif;
+    }
+    button,input { font:inherit; }
+    main { width:min(1240px,96vw); margin:auto; padding:16px 0 40px; }
+    .top-controls {
+      display:grid; grid-template-columns:auto repeat(3,minmax(165px,1fr)); gap:12px;
+      align-items:center; margin-bottom:12px; padding:13px;
+      border:1px solid rgba(56,83,64,.13); border-radius:22px;
+      background:rgba(255,250,240,.86); box-shadow:0 12px 28px rgba(42,70,51,.1);
+    }
+    .play { height:48px; padding:0 22px; border:0; border-radius:15px; color:white; background:var(--ink); font-weight:1000; cursor:pointer; }
+    .control { padding:9px 12px; border-radius:15px; background:#eeeadc; }
+    .control label { display:flex; justify-content:space-between; gap:12px; font-size:11px; font-weight:950; }
+    .control output { color:#318a50; }
+    input[type=range] { width:100%; margin:8px 0 0; accent-color:#318a50; }
+
+    .action-tabs { display:flex; gap:8px; overflow-x:auto; padding:2px 1px 13px; scrollbar-width:thin; }
+    .action-tab {
+      flex:0 0 auto; padding:10px 13px; border:1px solid rgba(56,83,64,.15); border-radius:14px;
+      color:var(--ink); background:rgba(255,250,240,.78); font-size:12px; font-weight:950; cursor:pointer;
+    }
+    .action-tab.active { color:white; border-color:var(--ink); background:var(--ink); box-shadow:0 7px 14px rgba(36,71,60,.2); }
+
+    .panel { overflow:hidden; border:1px solid rgba(56,83,64,.13); border-radius:30px; background:rgba(255,250,240,.96); box-shadow:0 18px 42px var(--shadow); }
+    .stage { position:relative; min-height:700px; padding:20px; }
+    .stage::before {
+      content:""; position:absolute; left:-12%; right:-12%; bottom:-140px; height:320px;
+      border-radius:50%; background:linear-gradient(#acd181,#83b764); opacity:.27;
+    }
+    .coach-ticket {
+      position:relative; z-index:5; display:grid; place-items:center;
+      width:min(560px,86%); min-height:62px; margin:0 auto; padding:13px 22px;
+      border:3px solid rgba(255,255,255,.78); border-radius:20px; color:white; background:var(--down);
+      text-align:center; font-size:19px; font-weight:1000; box-shadow:0 12px 25px rgba(61,125,181,.25);
+      transition:background .2s ease;
+    }
+    .coach-ticket.up { background:var(--up); }
+    .coach-ticket.hold { background:var(--hold); }
+    .coach-ticket.warn { background:var(--bad); }
+
+    .motion-stage { position:relative; z-index:1; width:min(900px,100%); aspect-ratio:1.55; margin:3px auto 0; }
+    .motion-stage svg { width:100%; height:100%; overflow:visible; }
+    .ground { stroke:#c7d3b8; stroke-width:3; stroke-linecap:round; }
+    .depth-grid { fill:none; stroke:rgba(93,120,100,.13); stroke-width:2; }
+    .body-line { fill:none; stroke:#2c5a4b; stroke-width:15; stroke-linecap:round; stroke-linejoin:round; }
+    .body-head { fill:#2c5a4b; }
+    .handle-dot { fill:#314e55; stroke:#fff; stroke-width:3; }
+    .track-shadow { display:none; }
+    .motion-track { fill:none; stroke:rgba(120,211,111,.42); stroke-width:7; stroke-linecap:round; stroke-dasharray:4 13; }
+    .motion-progress { fill:none; stroke:var(--down); stroke-width:43; stroke-linecap:round; filter:drop-shadow(0 7px 5px rgba(60,78,84,.18)); }
+    .speed-zone { fill:none; stroke:var(--speed); stroke-width:55; stroke-linecap:round; opacity:.88; filter:drop-shadow(0 0 8px rgba(120,211,111,.42)); }
+    .actual-marker { fill:white; stroke:var(--ink); stroke-width:5; filter:drop-shadow(0 5px 5px rgba(36,71,60,.28)); }
+    .motion-arrow {
+      fill:var(--down); stroke:white; stroke-width:3; stroke-linejoin:round;
+      filter:drop-shadow(0 7px 5px rgba(36,71,60,.32));
+    }
+    .motion-arrow.up { fill:var(--up); }
+    .hold-ring { fill:none; stroke:var(--hold); stroke-width:7; opacity:0; }
+    .hold-ring.show { animation:holdPulse .75s ease-in-out infinite; }
+    .hold-label { fill:white; font-size:15px; font-weight:1000; text-anchor:middle; paint-order:stroke; stroke:var(--hold); stroke-width:11px; opacity:0; }
+    .hold-label.show { opacity:1; }
+    .depth-channel { fill:rgba(79,143,199,.08); stroke:rgba(79,143,199,.45); stroke-width:3; stroke-dasharray:7 8; }
+    .depth-guide { fill:none; stroke:rgba(79,143,199,.5); stroke-width:4; stroke-dasharray:7 9; }
+    .depth-label { fill:#688071; font-size:11px; font-weight:950; text-anchor:middle; }
+    @keyframes holdPulse { 0%,100%{opacity:.42;stroke-width:6} 50%{opacity:1;stroke-width:12} }
+
+    .cop-widget { transition:opacity .25s ease; }
+    .cop-plate { fill:rgba(224,231,211,.72); stroke:#bdc9b7; stroke-width:2; }
+    .cop-safe { fill:rgba(120,211,111,.15); stroke:rgba(49,138,80,.55); stroke-width:2; stroke-dasharray:5 6; }
+    .cop-cross { stroke:rgba(36,71,60,.18); stroke-width:2; }
+    .cop-trail { fill:none; stroke:rgba(49,138,80,.25); stroke-width:7; stroke-linecap:round; }
+    .cop-dot { fill:#318a50; stroke:white; stroke-width:5; }
+
+    @media(max-width:850px) {
+      .top-controls { grid-template-columns:1fr 1fr; }
+      .stage { min-height:650px; }
+    }
+    @media(max-width:570px) {
+      .top-controls { grid-template-columns:1fr; }
+      .stage { padding:13px; }
+      .coach-ticket { font-size:15px; width:92%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="top-controls">
+    <button class="play" id="play">暂停 Demo</button>
+    <div class="control">
+      <label>你的动作速度 <output id="speedOut">标准</output></label>
+      <input id="speedControl" type="range" min="55" max="145" value="100">
+    </div>
+    <div class="control">
+      <label>CoP 稳定度 <output id="stabilityOut">82%</output></label>
+      <input id="stabilityControl" type="range" min="15" max="100" value="82">
+    </div>
+    <div class="control">
+      <label>HOLD 时长 <output id="holdOut">0.8s</output></label>
+      <input id="holdControl" type="range" min="3" max="18" value="8">
+    </div>
+  </section>
+
+  <nav class="action-tabs" id="actionTabs"></nav>
+
+  <article class="panel stage">
+    <div class="coach-ticket" id="coachTicket">保持这个速度</div>
+
+    <div class="motion-stage">
+      <svg viewBox="0 0 900 580" aria-label="动作 ROM、速度与 CoP">
+        <line class="ground" x1="90" y1="505" x2="810" y2="505"/>
+        <path class="depth-grid" d="M120 505Q450 410 780 505M170 505Q450 445 730 505"/>
+        <path class="depth-channel" id="depthChannel"/>
+        <path class="depth-guide" id="depthGuide"/>
+        <text class="depth-label" id="depthLabel"></text>
+
+        <path class="track-shadow" id="trackShadow"/>
+        <path class="motion-track" id="motionTrack"/>
+        <path class="speed-zone" id="speedZone"/>
+        <path class="motion-progress" id="motionProgress"/>
+        <circle class="actual-marker" id="actualMarker" r="13"/>
+        <path class="motion-arrow" id="motionArrow" d="M0 -28L27 8H12V34H-12V8H-27Z"/>
+        <circle class="hold-ring" id="holdRing" r="29"/>
+        <text class="hold-label" id="holdLabel">HOLD</text>
+
+        <g class="cop-widget">
+          <ellipse class="cop-plate" cx="350" cy="469" rx="150" ry="32"/>
+          <ellipse class="cop-safe" cx="350" cy="469" rx="64" ry="18"/>
+          <path class="cop-cross" d="M200 469h300M350 437v64"/>
+        </g>
+
+        <g id="athlete">
+          <circle class="body-head" id="head" cx="330" cy="150" r="26"/>
+          <path class="body-line" id="torso" d="M330 181L335 302"/>
+          <path class="body-line" id="armL" d="M334 220L275 246"/>
+          <path class="body-line" id="armR" d="M335 220L400 246"/>
+          <path class="body-line" id="legL" d="M335 302L284 444"/>
+          <path class="body-line" id="legR" d="M335 302L419 438"/>
+          <circle class="handle-dot" id="handleDot" cx="408" cy="246" r="9"/>
+        </g>
+
+        <g class="cop-widget">
+          <path class="cop-trail" id="copTrail" d="M350 469Q350 469 350 469"/>
+          <circle class="cop-dot" id="copDot" cx="350" cy="469" r="10"/>
+        </g>
+      </svg>
+    </div>
+
+  </article>
+</main>
+
+<script>
+  const actions = [
+    {
+      name:"弓步俯身划船", hardware:"Single Handle", mode:"纵深通道 · 拉向身体",
+      path:"M555 235 L500 330", depth:true,
+      downLabel:"控制伸直手臂", upLabel:"继续拉向身体",
+      pose:"row", channel:"M574 224L545 247L482 341L516 318Z", guide:"M555 235L500 330", guideLabel:"远 → 近"
+    },
+    {
+      name:"侧平举", hardware:"Single Handle", mode:"单条侧向弧线",
+      path:"M405 390 Q540 350 602 225", depth:false,
+      downLabel:"控制手臂下降", upLabel:"继续抬到肩高",
+      pose:"raise", channel:"", guide:"", guideLabel:""
+    },
+    {
+      name:"壶铃摆举", hardware:"Single Handle", mode:"单条摆钟弧线",
+      path:"M360 430 Q505 360 555 195", depth:true,
+      downLabel:"跟随回摆，稳定接住", upLabel:"髋部发力，继续摆起",
+      pose:"swing", channel:"", guide:"", guideLabel:""
+    },
+    {
+      name:"单臂上斜推胸", hardware:"Single Handle", mode:"纵深通道 · 向前上方",
+      path:"M510 350 L550 185", depth:true,
+      downLabel:"控制手柄回到胸前", upLabel:"沿斜上方向继续推出",
+      pose:"press", channel:"M491 353L526 358L570 182L532 178Z", guide:"M510 350L550 185", guideLabel:"近 → 远"
+    },
+    {
+      name:"深蹲", hardware:"T-Bar", mode:"垂直轨迹",
+      path:"M535 440 L535 125", depth:false, initialDown:true,
+      downLabel:"保持这个速度，稳定下蹲", upLabel:"很好，继续向上站起",
+      pose:"squat", channel:"", guide:"", guideLabel:""
+    },
+    {
+      name:"硬拉上提", hardware:"T-Bar", mode:"全身长竖线",
+      path:"M535 440 L535 125", depth:false, initialDown:true,
+      downLabel:"先降手臂，再屈髋下放", upLabel:"起杆后继续向胸前高拉",
+      pose:"highpull", channel:"", guide:"", guideLabel:""
+    },
+    {
+      name:"直立提拉", hardware:"T-Bar", mode:"全身长竖线",
+      path:"M535 440 L535 125", depth:false, initialDown:true,
+      downLabel:"沿身体中线控制下放", upLabel:"肘部带动，沿中线向上提",
+      pose:"upright", channel:"", guide:"", guideLabel:""
+    }
+  ];
+
+  const $ = selector => document.querySelector(selector);
+  const tabs = $("#actionTabs"), track = $("#motionTrack"), shadow = $("#trackShadow");
+  const progress = $("#motionProgress"), speedZone = $("#speedZone"), marker = $("#actualMarker");
+  const arrow = $("#motionArrow"), holdRing = $("#holdRing"), holdLabel = $("#holdLabel");
+  let actionIndex=4, state="down", phaseProgress=0, targetProgress=0;
+  let speed=1, stability=.82, holdDuration=800, holdStarted=0, running=true, last=performance.now(), pathLength=1;
+
+  function action(){ return actions[actionIndex]; }
+  function isHold(){ return state==="end-hold"||state==="start-hold"; }
+  function pointAt(v){ return track.getPointAtLength(pathLength*Math.max(0,Math.min(1,v))); }
+
+  function poseMarkup(type){
+    const standard = {
+      head:[330,150], shoulder:[334,220], hip:[335,302], leftFoot:[284,444], rightFoot:[419,438]
+    };
+    const poses = {
+      row:{head:[310,185],shoulder:[326,240],hip:[350,315],leftFoot:[265,445],rightFoot:[435,438]},
+      raise:standard, swing:standard, press:{head:[315,170],shoulder:[330,228],hip:[340,310],leftFoot:[290,445],rightFoot:[425,438]},
+      squat:standard, highpull:standard, upright:standard
+    };
+    const p=poses[type]||standard;
+    $("#head").setAttribute("cx",p.head[0]); $("#head").setAttribute("cy",p.head[1]);
+    $("#torso").setAttribute("d",`M${p.head[0]} ${p.head[1]+31}L${p.hip[0]} ${p.hip[1]}`);
+    $("#legL").setAttribute("d",`M${p.hip[0]} ${p.hip[1]}L${p.leftFoot[0]} ${p.leftFoot[1]}`);
+    $("#legR").setAttribute("d",`M${p.hip[0]} ${p.hip[1]}L${p.rightFoot[0]} ${p.rightFoot[1]}`);
+  }
+
+  function setAction(index){
+    actionIndex=index; state=action().initialDown?"down":"up"; phaseProgress=0; targetProgress=0; holdStarted=0;
+    track.setAttribute("d",action().path); shadow.setAttribute("d",action().path);
+    speedZone.setAttribute("d",action().path); progress.setAttribute("d",action().path);
+    pathLength=track.getTotalLength();
+    [track,shadow,speedZone,progress].forEach(p=>p.style.strokeDasharray=`${pathLength} ${pathLength}`);
+    $("#depthChannel").setAttribute("d",action().channel||"");
+    $("#depthGuide").setAttribute("d",action().guide||"");
+    $("#depthLabel").textContent=action().guideLabel;
+    $("#depthLabel").setAttribute("x",action().depth?590:0);
+    $("#depthLabel").setAttribute("y",action().depth?375:0);
+    poseMarkup(action().pose);
+    tabs.querySelectorAll("button").forEach((b,i)=>b.classList.toggle("active",i===index));
+  }
+
+  function setState(next,now){ state=next; phaseProgress=0; targetProgress=0; holdStarted=isHold()?now:0; }
+  function advance(now){
+    if(state==="up")setState("end-hold",now);
+    else if(state==="end-hold")setState("down",now);
+    else if(state==="down")setState("start-hold",now);
+    else setState("up",now);
+  }
+  function segment(center,size=.18){
+    const start=Math.max(0,Math.min(1-size,center-size/2));
+    return {array:`${pathLength*size} ${pathLength*(1-size)}`,offset:-pathLength*start};
+  }
+
+  function updateFigure(v){
+    const type=action().pose;
+    if(type==="squat"){
+      const headY=150+v*75, shoulderY=220+v*58, hipY=302+v*40, handY=246+v*52;
+      $("#head").setAttribute("cy",headY); $("#torso").setAttribute("d",`M330 ${headY+31}L335 ${hipY}`);
+      $("#armL").setAttribute("d",`M334 ${shoulderY}L275 ${handY}`); $("#armR").setAttribute("d",`M335 ${shoulderY}L400 ${handY}`);
+      $("#legL").setAttribute("d",`M335 ${hipY}L${284-v*34} 444`); $("#legR").setAttribute("d",`M335 ${hipY}L${419+v*34} 438`);
+      $("#handleDot").setAttribute("cx",408); $("#handleDot").setAttribute("cy",handY);
+    } else {
+      const point=pointAt(v), scale=action().depth?.72+v*.28:1;
+      $("#handleDot").setAttribute("cx",point.x); $("#handleDot").setAttribute("cy",point.y); $("#handleDot").setAttribute("r",9*scale);
+    }
+  }
+
+  function render(now){
+    const dt=Math.min(40,now-last); last=now;
+    if(running){
+      if(isHold()){ if(now-holdStarted>=holdDuration)advance(now); }
+      else {
+        const rate=.18; targetProgress=Math.min(1,targetProgress+rate*dt/1000); phaseProgress=Math.min(1,phaseProgress+rate*speed*dt/1000);
+        if(targetProgress>=1)advance(now);
+      }
+    }
+    const up=state==="up"||state==="end-hold";
+    const actualPosition=state==="up"?phaseProgress:state==="end-hold"?1:state==="down"?1-phaseProgress:0;
+    const targetPosition=state==="up"?targetProgress:state==="end-hold"?1:state==="down"?1-targetProgress:0;
+    const z=segment(targetPosition); speedZone.style.strokeDasharray=z.array; speedZone.style.strokeDashoffset=z.offset;
+    const delta=phaseProgress-targetProgress, onPace=isHold()||Math.abs(delta)<=.09;
+    speedZone.style.stroke=onPace?"var(--speed)":"#f29a82";
+    if(!isHold()){
+      progress.style.strokeDasharray=`${pathLength*phaseProgress} ${pathLength}`;
+      progress.style.strokeDashoffset=state==="down"?`${-pathLength*(1-phaseProgress)}`:"0";
+    }
+    const p=pointAt(actualPosition), scale=action().depth?.72+actualPosition*.28:1;
+    marker.setAttribute("cx",p.x); marker.setAttribute("cy",p.y); marker.setAttribute("r",13*scale);
+    const p2=pointAt(Math.max(0,Math.min(1,actualPosition+(state==="up"?.025:-.025))));
+    const angle=Math.atan2(p2.y-p.y,p2.x-p.x)*180/Math.PI+90;
+    arrow.setAttribute("transform",`translate(${p.x+58} ${p.y}) rotate(${angle}) scale(${scale})`);
+    arrow.classList.toggle("up",state==="up"); arrow.style.opacity=isHold()?"0":"1";
+    holdRing.setAttribute("cx",p.x); holdRing.setAttribute("cy",p.y); holdRing.setAttribute("r",29*scale);
+    holdLabel.setAttribute("x",p.x); holdLabel.setAttribute("y",p.y-42); holdRing.classList.toggle("show",isHold()); holdLabel.classList.toggle("show",isHold());
+    updateFigure(actualPosition);
+
+    const wobble=(1-stability)*62*(isHold()?1.25:1);
+    const cx=350+Math.sin(now/310)*wobble*.72+Math.sin(now/119)*wobble*.18;
+    const cy=469+Math.cos(now/390)*wobble*.24+Math.cos(now/147)*wobble*.09;
+    $("#copDot").setAttribute("cx",cx); $("#copDot").setAttribute("cy",cy);
+    $("#copTrail").setAttribute("d",`M350 469Q${350+(cx-350)*.35} ${469+(cy-469)*.35} ${cx} ${cy}`);
+
+    const ticket=$("#coachTicket"); ticket.className="coach-ticket";
+    if(stability<=.45){ ticket.textContent="重心回到中间"; ticket.classList.add("warn"); }
+    else if(isHold()){ ticket.textContent=state==="end-hold"?"停住，保持末端稳定":"稳住，准备反向"; ticket.classList.add("hold"); }
+    else if(!onPace){ ticket.textContent=delta>0?"慢一点，保持控制":"再快一点，跟上节奏"; ticket.classList.add("warn"); }
+    else { ticket.textContent=state==="up"?action().upLabel:action().downLabel; if(state==="up")ticket.classList.add("up"); }
+    requestAnimationFrame(render);
+  }
+
+  tabs.innerHTML=actions.map((a,i)=>`<button class="action-tab" data-index="${i}">${a.hardware==="T-Bar"?"T · ":""}${a.name}</button>`).join("");
+  tabs.addEventListener("click",e=>{const b=e.target.closest("button");if(b)setAction(Number(b.dataset.index));});
+  $("#play").addEventListener("click",e=>{running=!running;e.currentTarget.textContent=running?"暂停 Demo":"继续 Demo";});
+  $("#speedControl").addEventListener("input",e=>{speed=Number(e.target.value)/100;$("#speedOut").textContent=speed<.86?"偏慢":speed>1.14?"偏快":"标准";});
+  $("#stabilityControl").addEventListener("input",e=>{stability=Number(e.target.value)/100;$("#stabilityOut").textContent=`${e.target.value}%`;});
+  $("#holdControl").addEventListener("input",e=>{holdDuration=Number(e.target.value)*100;$("#holdOut").textContent=`${(holdDuration/1000).toFixed(1)}s`;});
+  setAction(4); requestAnimationFrame(render);
+</script>
+</body>
+</html>
